@@ -1,0 +1,16 @@
+[package]
+name = "typst-parse"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Typewright helper: exposes Typst's official parser (typst-syntax) as JSON lines"
+publish = false
+
+[dependencies]
+typst-syntax = "0.15"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
