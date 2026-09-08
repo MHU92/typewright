@@ -1,0 +1,119 @@
+{
+  "name": "typewright",
+  "productName": "Typewright",
+  "version": "0.1.0",
+  "description": "A word processor for Typst: edit .typ files like a Word document, with Claude Code or Codex built in.",
+  "main": "dist-electron/main.cjs",
+  "private": true,
+  "type": "module",
+  "author": "Marcel Hühn",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/MHU92/typewright",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MHU92/typewright.git"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build:native": "cargo build --release --manifest-path native/typst-parse/Cargo.toml",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:native && npm run build:renderer && npm run build:electron",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx tests/roundtrip.ts && tsx tests/i18n.ts",
+    "check:i18n": "tsx tests/i18n.ts",
+    "dist": "npm run build && electron-builder --mac --arm64"
+  },
+  "build": {
+    "appId": "io.github.mhu92.typewright",
+    "productName": "Typewright",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**"
+    ],
+    "extraResources": [
+      {
+        "from": "native/typst-parse/target/release/typst-parse",
+        "to": "typst-parse"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dir"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "identity": null,
+      "darkModeSupport": false
+    },
+    "fileAssociations": [
+      {
+        "ext": "typ",
+        "name": "Typst document",
+        "description": "Typst document",
+        "role": "Editor",
+        "rank": "Alternate"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@electron/rebuild": "^4.2.1",
+    "@lezer/highlight": "^1.2.5",
+    "@tiptap/core": "^3.32.2",
+    "@tiptap/extension-blockquote": "^3.32.2",
+    "@tiptap/extension-bold": "^3.32.2",
+    "@tiptap/extension-code": "^3.32.2",
+    "@tiptap/extension-code-block": "^3.32.2",
+    "@tiptap/extension-document": "^3.32.2",
+    "@tiptap/extension-hard-break": "^3.32.2",
+    "@tiptap/extension-heading": "^3.32.2",
+    "@tiptap/extension-highlight": "^3.32.2",
+    "@tiptap/extension-horizontal-rule": "^3.32.2",
+    "@tiptap/extension-italic": "^3.32.2",
+    "@tiptap/extension-link": "^3.32.2",
+    "@tiptap/extension-list": "^3.32.2",
+    "@tiptap/extension-paragraph": "^3.32.2",
+    "@tiptap/extension-strike": "^3.32.2",
+    "@tiptap/extension-subscript": "^3.32.2",
+    "@tiptap/extension-superscript": "^3.32.2",
+    "@tiptap/extension-table": "^3.32.2",
+    "@tiptap/extension-text": "^3.32.2",
+    "@tiptap/extension-text-style": "^3.32.2",
+    "@tiptap/extension-underline": "^3.32.2",
+    "@tiptap/extensions": "^3.32.2",
+    "@tiptap/pm": "^3.32.2",
+    "@tiptap/react": "^3.32.2",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.65.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
+  }
+}
