@@ -1633,3 +1633,324 @@ button {
   text-align: right;
 }
 
+/* Dialoge */
+.tw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  display: grid;
+  place-items: center;
+  z-index: 200;
+}
+.tw-modal {
+  width: 520px;
+  max-width: calc(100vw - 60px);
+  max-height: calc(100vh - 80px);
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tw-modal.wide {
+  width: 860px;
+}
+.tw-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.tw-modal-head button {
+  border: none;
+  background: none;
+  display: flex;
+  padding: 3px;
+  border-radius: 4px;
+}
+.tw-modal-head button:hover {
+  background: var(--hover);
+}
+.tw-modal-hint {
+  padding: 0 16px 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.tw-modal-hint code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: #f3f3f3;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.tw-modal-code {
+  margin: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+.tw-modal-code.tall {
+  height: min(560px, calc(100vh - 260px));
+}
+.tw-modal-code .tw-code-editor {
+  flex: 1;
+  min-height: 0;
+}
+.tw-modal-code .cm-editor {
+  height: 100%;
+}
+.tw-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.tw-modal-kbd {
+  color: var(--text-soft);
+  font-size: 11.5px;
+  margin-right: 4px;
+}
+.tw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 16px;
+}
+.tw-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.tw-form .tw-input {
+  height: 28px;
+  font-size: 13px;
+}
+.tw-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.tw-form .tw-check {
+  flex-direction: row;
+  align-items: center;
+  grid-column: span 2;
+}
+.tw-inputs {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tw-inputs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tw-inputs-row .tw-input {
+  flex: 1;
+  height: 28px;
+}
+.tw-inputs-row button {
+  border: none;
+  background: none;
+  display: flex;
+  padding: 4px;
+  border-radius: 4px;
+}
+.tw-inputs-row button:hover {
+  background: var(--hover);
+}
+
+/* Datei-Ansicht */
+.tw-backstage {
+  position: fixed;
+  top: 38px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  z-index: 150;
+  background: #fff;
+}
+.tw-backstage-nav {
+  width: 230px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+}
+.tw-backstage-nav button {
+  border: none;
+  background: none;
+  color: #fff;
+  text-align: left;
+  padding: 10px 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+.tw-backstage-nav button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.tw-backstage-nav button.on {
+  background: rgba(255, 255, 255, 0.2);
+}
+.tw-backstage-back {
+  margin-bottom: 10px;
+  opacity: 0.9;
+}
+.tw-backstage-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 10px 22px;
+}
+.tw-backstage-body {
+  flex: 1;
+  overflow: auto;
+  padding: 26px 48px;
+}
+.tw-backstage-body h1 {
+  font-weight: 300;
+  font-size: 30px;
+  margin: 0 0 22px;
+}
+.tw-backstage-body h2 {
+  font-weight: 400;
+  font-size: 17px;
+  margin: 26px 0 10px;
+}
+.tw-info-grid {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 9px 16px;
+  font-size: 13px;
+  margin-bottom: 22px;
+  max-width: 820px;
+}
+.tw-info-grid > div:nth-child(odd) {
+  color: var(--text-soft);
+}
+.tw-info-actions {
+  margin-left: 10px;
+}
+.tw-templates {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.tw-template {
+  width: 160px;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 6px;
+  border-radius: 6px;
+}
+.tw-template:hover {
+  background: var(--accent-softer);
+}
+.tw-template span {
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+.tw-template-thumb {
+  height: 196px;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: #c8c6c4;
+  margin-bottom: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.tw-recent {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+}
+.tw-options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+}
+.tw-options label {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.tw-options label > span {
+  color: var(--text-soft);
+}
+.tw-options .tw-select,
+.tw-options .tw-input {
+  height: 28px;
+  font-size: 13px;
+}
+.tw-options label.tw-check {
+  display: flex;
+}
+.tw-options label.tw-check > span {
+  color: var(--text);
+}
+.tw-about {
+  max-width: 680px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.tw-about h1 {
+  margin-bottom: 4px !important;
+}
+.tw-about-sub {
+  margin: 0 0 24px;
+  color: var(--text-soft);
+  font-size: 15px;
+}
+.tw-about a {
+  color: var(--accent);
+}
+.tw-about-note {
+  color: var(--text-soft);
+  font-size: 12.5px;
+}
+.tw-recent button {
+  border: none;
+  background: none;
+  text-align: left;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--accent);
+}
+.tw-recent button:hover {
+  background: var(--accent-softer);
+}
+.tw-recent button div {
+  display: flex;
+  flex-direction: column;
+}
+.tw-recent button b {
+  color: var(--text);
+  font-weight: 500;
+}
+.tw-recent button span {
+  color: var(--text-soft);
+  font-size: 11.5px;
+}
