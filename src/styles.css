@@ -1633,6 +1633,22 @@ button {
   text-align: right;
 }
 
+/* Von außen geänderte Blöcke kurz hervorheben */
+.tw-flash {
+  animation: tw-flash 2.6s ease-out;
+}
+@keyframes tw-flash {
+  0%,
+  25% {
+    background-color: rgba(217, 119, 87, 0.22);
+    box-shadow: 0 0 0 4px rgba(217, 119, 87, 0.22);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
 /* Dialoge */
 .tw-modal-backdrop {
   position: fixed;
