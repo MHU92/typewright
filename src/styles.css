@@ -1840,6 +1840,79 @@ button {
   color: #fff;
 }
 
+/* Schnellzugriff (Titelleiste) */
+.tw-quick {
+  position: absolute;
+  left: 82px;
+  top: 7px;
+  display: flex;
+  gap: 1px;
+  -webkit-app-region: no-drag;
+}
+.tw-quick button {
+  border: none;
+  background: none;
+  color: #fff;
+  display: flex;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.tw-quick button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+.tw-quick button:disabled {
+  opacity: 0.4;
+}
+
+/* Automatisch sichern (Titelleiste) */
+.tw-autosave {
+  position: absolute;
+  left: 180px;
+  top: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: none;
+  color: #fff;
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.tw-autosave:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.tw-autosave-label,
+.tw-autosave-state {
+  opacity: 0.85;
+}
+.tw-switch {
+  width: 28px;
+  height: 15px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  position: relative;
+  transition: background 0.15s;
+}
+.tw-switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.tw-autosave.on .tw-switch {
+  background: #fff;
+}
+.tw-autosave.on .tw-switch i {
+  background: var(--accent);
+  transform: translateX(13px);
+}
+
 /* Von außen geänderte Blöcke kurz hervorheben */
 .tw-flash {
   animation: tw-flash 2.6s ease-out;
@@ -1854,6 +1927,35 @@ button {
     background-color: transparent;
     box-shadow: 0 0 0 4px transparent;
   }
+}
+
+/* Toast */
+.tw-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #323130;
+  color: #fff;
+  padding: 7px 8px 7px 16px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tw-toast button {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.tw-toast button:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* Dialoge */
