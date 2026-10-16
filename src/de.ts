@@ -1,0 +1,83 @@
+// German UI strings, keyed by the English text used in the code.
+// `npm run check:i18n` reports keys that are missing here.
+
+export const DE: Record<string, string> = {
+  // App, toasts, banner
+  'Start writing …': 'Hier schreiben …',
+  '(section “{heading}”) ': '(Abschnitt „{heading}“) ',
+  'passage: “{text}”': 'Stelle: „{text}“',
+  'PDF saved: {file}': 'PDF gespeichert: {file}',
+  'The AI': 'Die KI',
+  '{who} changed the document': '{who} hat das Dokument geändert',
+  'Change from outside applied': 'Änderung von außen übernommen',
+  Undo: 'Rückgängig',
+  'Starting Typewright …': 'Typewright wird gestartet …',
+  Untitled: 'Unbenannt',
+  'The file was changed outside the editor (e.g. by an AI in the terminal). You have unsaved changes here.':
+    'Die Datei wurde außerhalb geändert (z. B. von einer KI im Terminal). Du hast hier ungesicherte Änderungen.',
+  'Load their version': 'Deren Version laden',
+  'Save my version': 'Meine Version sichern',
+
+  // Title bar, status bar
+  'Save (⌘S)': 'Sichern (⌘S)',
+  'Undo (⌘Z)': 'Rückgängig (⌘Z)',
+  'Redo (⇧⌘Z)': 'Wiederholen (⇧⌘Z)',
+  'While the AI terminal is open, the editor saves automatically so the AI always sees your current text':
+    'Solange das KI-Terminal offen ist, sichert der Editor automatisch, damit die KI immer deinen aktuellen Stand sieht',
+  AutoSave: 'Automatisch sichern',
+  'On (AI open)': 'An (KI offen)',
+  On: 'An',
+  Off: 'Aus',
+  Edited: 'Bearbeitet',
+  Saved: 'Gesichert',
+  'Chapter of {file}': 'Kapitel von {file}',
+  'Page {page} of {pages}': 'Seite {page} von {pages}',
+  'No pages': 'Keine Seiten',
+  '{n} words': '{n} Wörter',
+  'Characters without spaces': 'Zeichen ohne Leerzeichen',
+  '{n} characters': '{n} Zeichen',
+  'Compiling …': 'Kompiliert …',
+  '1 error': '1 Fehler',
+  '{n} errors': '{n} Fehler',
+
+  // Panes
+  'Print Preview': 'Druckvorschau',
+  'via {file}': 'über {file}',
+  'Scroll the preview along with the editor': 'Vorschau mit dem Editor mitscrollen',
+  follow: 'folgen',
+  'Hide preview': 'Vorschau ausblenden',
+  'Line {n}': 'Zeile {n}',
+  'Page {page}': 'Seite {page}',
+  'No preview yet': 'Noch keine Vorschau',
+  Navigation: 'Navigation',
+  'Headings appear here. Apply the “Heading 1” style to a paragraph.': 'Überschriften erscheinen hier. Weise einem Absatz die Formatvorlage „Überschrift 1“ zu.',
+  '(empty)': '(leer)',
+  'Typst Source': 'Typst-Quelltext',
+  'Changes here are applied to the editor right away': 'Änderungen hier übernimmt der Editor sofort',
+  Find: 'Suchen',
+  '{i} of {n}': '{i} von {n}',
+  'No results': 'Keine Treffer',
+  'Match case': 'Groß-/Kleinschreibung',
+  'Whole words only': 'Nur ganze Wörter',
+  'Previous (⇧↩)': 'Vorheriger (⇧↩)',
+  'Next (↩)': 'Nächster (↩)',
+  'Show or hide replace': 'Ersetzen ein-/ausblenden',
+  'Close (Esc)': 'Schließen (Esc)',
+  'Replace with': 'Ersetzen durch',
+  Replace: 'Ersetzen',
+  'Replace all': 'Alle ersetzen',
+  'Problems while compiling': 'Probleme beim Kompilieren',
+  'Show source': 'Quelltext zeigen',
+  Hint: 'Tipp',
+
+  // Ribbon tabs
+  File: 'Datei',
+  Home: 'Start',
+  Insert: 'Einfügen',
+  Layout: 'Layout',
+  View: 'Ansicht',
+  Table: 'Tabelle',
+  'AI in the editor (⌘J) · send selection with ⌘L': 'KI im Editor (⌘J) · Markierung senden mit ⌘L',
+  'More colors …': 'Weitere Farben …',
+
+};
