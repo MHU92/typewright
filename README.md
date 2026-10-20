@@ -51,6 +51,29 @@ Copy `Typewright.app` to `~/Applications` or `/Applications` and open `.typ` fil
 
 For development: `npm run build:native` once, then `npm run dev` (Vite + Electron with live reload).
 
+## How it works
+
+| Part | Implementation |
+| --- | --- |
+| Parsing | `native/typst-parse`: a tiny Rust program around `typst-syntax` that returns the lossless syntax tree as JSON |
+| Typst → editor | `src/typst/parse.ts` turns the tree into a ProseMirror document (TipTap) |
+| Editor → Typst | `src/typst/serialize.ts`; unchanged blocks come back verbatim from the original source |
+| Rendering in the editor | Code blocks and equations are rendered as pages of a helper document that carries your template (`src/render/snippets.ts`) |
+| Page look | Paper, margins, font, size, spacing and numbering are read from Typst (`typst eval`) |
+| Preview | `typst compile` to SVG; unsaved text is compiled through a mirror folder of symlinks, so relative imports and images keep working |
+| AI terminal | xterm.js + node-pty; Claude Code gets instructions via `--append-system-prompt` and the live context via a `UserPromptSubmit` hook |
+
+## Tests
+
+```sh
+npm test                                   # round-trip tests + translation check
+npx tsx tests/roundtrip.ts my/file.typ     # run the round trip on your own files
+```
+
+For every file, the round-trip test checks that (1) loading and saving without changes reproduces the source exactly, and (2) writing the whole document from scratch makes Typst render identical pages (compared as SVG). During development it passed on 27 real-world documents (contracts, business plans, pitch decks, reports).
+
+UI tests can be scripted: `TW_AUTOTEST=script.js TW_SCREENSHOT=shot.png npx electron . file.typ` runs a script in the window (`window.__tw` exposes the editor and commands), saves a screenshot and quits.
+
 ## License
 
 [Apache License 2.0](LICENSE), the same license as Typst. See [NOTICE](NOTICE) for third-party credits.
