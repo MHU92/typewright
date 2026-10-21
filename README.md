@@ -33,6 +33,16 @@ Huge thanks to Laurenz Mädje, Martin Haug and everyone who builds Typst. If you
 - **AutoSave**, conflict protection and live reload when the file changes on disk.
 - **English and German** user interface (File → Options).
 
+## AI in the terminal
+
+Typewright has a built-in terminal panel (⌘J) that starts **Claude Code**, **Codex** or any command you choose, in your project folder and with your own subscription.
+
+- The AI knows that "the document" is the file open in the editor. Claude Code receives the open file, its outline, the section and paragraph at your cursor and your selection with every message; Codex reads the same context from a file the editor keeps up to date.
+- Say *"update the title"* or *"make this paragraph shorter"* and watch the change appear live in the page, briefly highlighted. ⌘Z (or the *Undo* button in the notification) takes it back.
+- ⌘L sends your selection to the AI's input, like in Cursor.
+- The panel docks to the bottom, top, left or right.
+- While the panel is open, AutoSave is on, so the AI always reads your latest text. If the AI changes the file while you have unsaved edits, Typewright asks instead of overwriting.
+
 ## Install
 
 Typewright currently targets **macOS** (Apple Silicon). There are no prebuilt downloads yet, so build it from source:
@@ -73,6 +83,17 @@ npx tsx tests/roundtrip.ts my/file.typ     # run the round trip on your own file
 For every file, the round-trip test checks that (1) loading and saving without changes reproduces the source exactly, and (2) writing the whole document from scratch makes Typst render identical pages (compared as SVG). During development it passed on 27 real-world documents (contracts, business plans, pitch decks, reports).
 
 UI tests can be scripted: `TW_AUTOTEST=script.js TW_SCREENSHOT=shot.png npx electron . file.typ` runs a script in the window (`window.__tw` exposes the editor and commands), saves a screenshot and quits.
+
+## Limitations and ideas
+
+- No track changes or threaded comments yet (Typst `//` comments are shown as notes and can be inserted).
+- The editor is one continuous page; real page breaks are shown in the preview.
+- Clicking in the preview doesn't jump to the editor yet.
+- No `.docx` import/export (pandoc could make that possible).
+- Custom `#show` rules for headings are only approximated in the editor; the preview is exact.
+- Some code comments are still in German. Translations welcome.
+
+Contributions are very welcome. UI strings go through `t('English text')` with German translations in `src/de.ts` (`npm run check:i18n` lists missing ones).
 
 ## License
 
