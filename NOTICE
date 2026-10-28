@@ -1,0 +1,33 @@
+Typewright
+Copyright 2026 Marcel Hühn
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+-------------------------------------------------------------------------------
+Built on Typst
+-------------------------------------------------------------------------------
+
+Typewright would not exist without Typst (https://typst.app,
+https://github.com/typst/typst). The bundled helper `typst-parse` includes the
+crates typst-syntax, typst-utils and typst-timing, copyright The Typst Project
+Developers, licensed under the Apache License, Version 2.0. Previews, PDF export
+and printing use the Typst CLI installed on the user's machine.
+
+Typst is a trademark of Typst GmbH. Typewright is an independent, non-commercial
+open-source project and is not affiliated with or endorsed by Typst GmbH.
+
+-------------------------------------------------------------------------------
+Other third-party software
+-------------------------------------------------------------------------------
+
+The application bundles open-source components under permissive licenses
+(MIT, ISC, BSD, Apache-2.0), among them Electron, React, TipTap and
+ProseMirror, CodeMirror, Lezer, xterm.js, node-pty and Lucide icons, and Rust
+crates such as serde, ecow and unicode-segmentation. Their license texts ship
+with each package (see node_modules/*/LICENSE and the crates' sources).
+Electron's and Chromium's licenses are included in every app build
+(LICENSE.electron.txt, LICENSES.chromium.html).
+
+Claude Code is a product of Anthropic; Codex is a product of OpenAI. Typewright
+only starts the command-line tools that the user has installed and is not
+affiliated with either company.
