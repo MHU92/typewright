@@ -8,6 +8,16 @@
   "type": "module",
   "author": "Marcel Hühn",
   "license": "Apache-2.0",
+  "keywords": [
+    "typst",
+    "word-processor",
+    "wysiwyg",
+    "editor",
+    "typesetting",
+    "electron",
+    "claude-code",
+    "codex"
+  ],
   "homepage": "https://github.com/MHU92/typewright",
   "repository": {
     "type": "git",
