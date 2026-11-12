@@ -31,7 +31,7 @@
     "build": "npm run build:native && npm run build:renderer && npm run build:electron",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx tests/roundtrip.ts && tsx tests/i18n.ts",
+    "test": "tsx tests/roundtrip.ts && tsx tests/fields.ts && tsx tests/i18n.ts",
     "check:i18n": "tsx tests/i18n.ts",
     "dist": "npm run build && electron-builder --mac --arm64"
   },

@@ -27,6 +27,7 @@ Huge thanks to Laurenz Mädje, Martin Haug and everyone who builds Typst. If you
 - **Formatting that maps to Typst:** bold, italic, underline, strikethrough, sub/superscript, small caps, font, size, color and highlight become `*…*`, `#text(…)[…]`, `#highlight[…]` and friends.
 - **Document layout** (Layout tab): paper size, orientation, margins, columns, header and footer, page numbers, default font and size, language, justification, line and paragraph spacing, heading numbering. These are written as `#set` rules in your document's template.
 - **Your own functions stay yours:** text inside `#callout[…]`, `#txt[…]` and the like stays editable; code-only calls such as charts are rendered by Typst right in the page.
+- **Fields for your own functions:** a call like `#entry("2024", "Founder", [Company], body: [- …])` is shown exactly as Typst typesets it. Click it and its strings and content blocks become editable right in the page, labelled with the parameter names from your `#let entry(when, title, org, body: none)`; Esc shows it typeset again. Saving rewrites only the argument you changed, so a CV, a letter or a table built from your own functions is as editable as plain text.
 - **Live print preview** that follows your scroll position, plus page count, word count and compile errors.
 - **Export** (⌘E): PDF, PDF/A (2b to 4) for archiving, accessible PDF/UA-1 (also combined with PDF/A-2 or A-3), HTML with MathML equations (experimental in Typst), PNG or SVG per page, and page ranges. Typst's conformance errors, such as missing alt text, are explained in plain words.
 - **Multi-file projects:** a chapter included via `#include` is previewed through its main file, with the main file's template.
@@ -92,6 +93,7 @@ UI tests can be scripted: `TW_AUTOTEST=script.js TW_SCREENSHOT=shot.png npx elec
 - Clicking in the preview doesn't jump to the editor yet.
 - No `.docx` import/export (pandoc could make that possible).
 - Custom `#show` rules for headings are only approximated in the editor; the preview is exact.
+- Field names come from functions defined in the open file. Functions imported from a template show numbered fields for now.
 - Some code comments are still in German. Translations welcome.
 
 Contributions are very welcome. UI strings go through `t('English text')` with German translations in `src/de.ts` (`npm run check:i18n` lists missing ones).

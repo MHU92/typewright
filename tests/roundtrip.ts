@@ -60,7 +60,7 @@ function stats(doc: { content?: unknown[] }) {
     for (const c of (n.content ?? []) as { type: string }[]) walk(c);
   };
   walk(doc as { type: string });
-  return ['paragraph', 'heading', 'callBlock', 'typstBlock', 'typstInline', 'table', 'bulletList', 'orderedList']
+  return ['paragraph', 'heading', 'callBlock', 'callFields', 'typstBlock', 'typstInline', 'table', 'bulletList', 'orderedList']
     .map((k) => `${k}=${counts[k] ?? 0}`)
     .join(' ');
 }

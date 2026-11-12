@@ -44,6 +44,17 @@ type Item =
 interface Ctx {
   src: string;
   records: SourceRecord[];
+  /** Parameter der im Dokument definierten Funktionen (für Feldnamen). */
+  sigs: Map<string, Signature>;
+}
+
+/** Parameterliste einer `#let name(...) = ...`-Funktion. */
+interface Signature {
+  /** Positionsparameter; null bei Destrukturierung. */
+  positional: (string | null)[];
+  named: string[];
+  /** Name des `..rest`-Parameters. */
+  spread: string | null;
 }
 
 interface Placed {
@@ -53,7 +64,7 @@ interface Placed {
 }
 
 const STATEMENT_KINDS = new Set(['LetBinding', 'SetRule', 'ShowRule', 'ModuleImport']);
-const LABELABLE = new Set(['heading', 'figure', 'table', 'image', 'callBlock', 'mathBlock', 'typstBlock']);
+const LABELABLE = new Set(['heading', 'figure', 'table', 'image', 'callBlock', 'callFields', 'mathBlock', 'typstBlock']);
 
 const SHORTHANDS: Record<string, string> = {
   '~': ' ',
@@ -65,7 +76,7 @@ const SHORTHANDS: Record<string, string> = {
 
 export function parseTypst(src: string, raw: RawCst): ParseResult {
   const root = hydrate(raw);
-  const ctx: Ctx = { src, records: [] };
+  const ctx: Ctx = { src, records: [], sigs: collectSignatures(root) };
   const { blocks, lead, trail } = parseBlocks(root.children, ctx);
   return {
     doc: { type: 'doc', content: blocks.length ? blocks : [{ type: 'paragraph' }] },
@@ -380,7 +391,163 @@ function blockFromCode(expr: Cst, start: number, end: number, ctx: Ctx): J {
   if (!info) return raw('expr');
   // Nur einfache Aufrufe ohne nachgestellten Code (z. B. Kommentar am Zeilenende) zerlegen
   if (expr.end !== end && src.slice(expr.end, end).trim() !== '') return raw('expr');
-  return blockFromCall(info, ctx, false) ?? raw('expr');
+  return fieldsFromCall(info, start, end, ctx) ?? blockFromCall(info, ctx, false) ?? raw('expr');
+}
+
+// ------------------------------------------------------------------ Eigene Funktionen mit Feldern
+
+/**
+ * Typst-Funktionen, die gerendert bleiben (Layout, Gestaltung, Daten): ihre Text-Argumente
+ * sind meist Einstellungen, keine Inhalte. Gilt nicht, wenn das Dokument den Namen selbst definiert.
+ */
+const STD_FUNCTIONS = new Set(
+  (
+    'align assert bibliography block box cbor circle cite colbreak columns counter csv curve datetime document duration ' +
+    'ellipse emph enum eval figure footnote grid h heading hide highlight html image json label layout line linebreak ' +
+    'link list locate lorem lower math measure metadata move numbering outline overline pad page pagebreak panic par ' +
+    'parbreak path place plugin polygon quote raw read rect ref regex repeat rotate scale selector skew smallcaps ' +
+    'smartquote square stack state str strike strong sub super sym symbol table terms text title toml underline ' +
+    'upper v xml yaml calc sys std pdf emoji int float array dict type version bytes decimal'
+  ).split(' '),
+);
+
+function collectSignatures(root: Cst): Map<string, Signature> {
+  const out = new Map<string, Signature>();
+  const visit = (node: Cst) => {
+    for (const c of node.children) {
+      if (c.kind === 'LetBinding') {
+        const closure = c.children.find((k) => k.kind === 'Closure');
+        // `#let f(a, b) = …` (Name in der Closure) oder `#let f = (a, b) => …`
+        const nameNode = closure?.children.find((k) => k.kind === 'Ident') ?? c.children.find((k) => k.kind === 'Ident');
+        const params = closure?.children.find((k) => k.kind === 'Params');
+        if (nameNode?.leaf && params && !out.has(nameNode.leaf)) {
+          const sig: Signature = { positional: [], named: [], spread: null };
+          for (const p of nonTrivia(params)) {
+            if (p.kind === 'LeftParen' || p.kind === 'RightParen' || p.kind === 'Comma') continue;
+            if (p.kind === 'Ident') sig.positional.push(p.leaf);
+            else if (p.kind === 'Named') sig.named.push(p.children[0]?.leaf ?? '');
+            else if (p.kind === 'Spread') sig.spread = p.children.find((k) => k.kind === 'Ident')?.leaf ?? null;
+            else sig.positional.push(null);
+          }
+          out.set(nameNode.leaf, sig);
+        }
+      }
+      if (c.children.length) visit(c);
+    }
+  };
+  visit(root);
+  return out;
+}
+
+interface FieldCandidate {
+  node: Cst;
+  label: string | null;
+}
+
+/** Strings und Inhaltsblöcke eines Arguments sammeln (auch in Arrays und Dictionaries). */
+function collectFields(node: Cst, label: string | null, out: FieldCandidate[]) {
+  if (node.kind === 'Str' || node.kind === 'ContentBlock') {
+    out.push({ node, label });
+    return;
+  }
+  if (node.kind === 'Array') {
+    let first = true;
+    for (const el of nonTrivia(node)) {
+      if (el.kind === 'LeftParen' || el.kind === 'RightParen' || el.kind === 'Comma') continue;
+      collectFields(el, first ? label : null, out);
+      first = false;
+    }
+  } else if (node.kind === 'Dict') {
+    for (const el of nonTrivia(node)) {
+      if (el.kind !== 'Named') continue;
+      const value = nonTrivia(el).slice(2)[0];
+      if (value) collectFields(value, el.children[0]?.leaf ?? null, out);
+    }
+  }
+}
+
+const HAS_WORD = /[\p{L}\p{N}]/u;
+
+/**
+ * Aufruf einer eigenen Funktion, z. B. `#entry("2024", "Titel", [Firma], body: [...])`:
+ * Strings und Inhaltsblöcke werden zu Feldern, die direkt in der Seite editierbar sind.
+ * Der übrige Aufruf bleibt als Vorlage erhalten; beim Speichern werden nur die Felder ersetzt.
+ */
+function fieldsFromCall(info: CallInfo, start: number, end: number, ctx: Ctx): J | null {
+  const { src } = ctx;
+  if (info.spread) return null;
+  const sig = ctx.sigs.get(info.callee) ?? null;
+  const base = info.callee.split('.')[0];
+  if (!sig && (STD_FUNCTIONS.has(info.callee) || STD_FUNCTIONS.has(base))) return null;
+
+  const posLabel = (i: number): string | null => {
+    if (!sig) return String(i + 1);
+    if (i < sig.positional.length) return sig.positional[i];
+    return sig.spread ? `${sig.spread} ${i - sig.positional.length + 1}` : null;
+  };
+  const cands: FieldCandidate[] = [];
+  const others: string[] = [];
+  info.positional.forEach((p, i) => {
+    const before = cands.length;
+    collectFields(p, posLabel(i), cands);
+    if (cands.length === before) others.push(src.slice(p.start, p.end));
+  });
+  const positionalFields = cands.length;
+  for (const n of info.named) {
+    const before = cands.length;
+    collectFields(n.value, n.name, cands);
+    if (cands.length === before) others.push(src.slice(n.node.start, n.node.end));
+  }
+  // `#callout(fill: red)[...]`: Inhalt nach den Klammern, aber kein Text in den Klammern → callBlock
+  if (!positionalFields && info.trailing.length) return null;
+  info.trailing.forEach((b, j) => collectFields(b, posLabel(info.positional.length + j), cands));
+  if (!cands.length) return null;
+
+  const recordsBefore = ctx.records.length;
+  const fields: J[] = [];
+  let editable = false;
+  for (let idx = 0; idx < cands.length; idx++) {
+    const { node, label } = cands[idx];
+    const text = src.slice(node.start, node.end);
+    let field: J;
+    if (node.kind === 'Str') {
+      const value = readStringLiteral(text);
+      // Zeilenumbrüche kann ein einzeiliges Feld nicht darstellen
+      if (value === null || value.includes('\n')) {
+        ctx.records.length = recordsBefore;
+        return null;
+      }
+      if (HAS_WORD.test(value)) editable = true;
+      field = { type: 'callFieldStr', attrs: { idx, label }, content: value ? [{ type: 'text', text: value }] : undefined };
+    } else {
+      const markup = contentMarkup(node);
+      const body = markup ? parseBlocks(markup.children, ctx) : { blocks: [], lead: '', trail: '' };
+      if (body.blocks.some(hasEditableText)) editable = true;
+      field = {
+        type: 'callFieldContent',
+        attrs: { idx, label, lead: body.lead, trail: body.trail },
+        content: body.blocks.length ? body.blocks : [{ type: 'paragraph' }],
+      };
+    }
+    ctx.records.push({ json: field, src: text, indent: lineIndent(src, node.start) });
+    fields.push(field);
+  }
+  // Nur Zahlen, Farben, Code: dann lieber so zeigen, wie Typst es rendert
+  if (!editable) {
+    ctx.records.length = recordsBefore;
+    return null;
+  }
+  return {
+    type: 'callFields',
+    attrs: {
+      callee: info.callee,
+      src: src.slice(start, end),
+      spans: cands.map(({ node }) => [node.start - start, node.end - start]),
+      others: others.length ? others : null,
+      baseIndent: lineIndent(src, start) ?? '',
+    },
+    content: fields,
+  };
 }
 
 function blockFromCall(info: CallInfo, ctx: Ctx, codeMode: boolean): J | null {

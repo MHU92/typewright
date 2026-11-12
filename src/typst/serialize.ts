@@ -154,6 +154,9 @@ class Serializer {
       case 'callBlock':
         out = this.callBlock(b, indent);
         break;
+      case 'callFields':
+        out = this.callFields(b, indent);
+        break;
       case 'image':
         out = this.image(b, false);
         break;
@@ -227,6 +230,56 @@ class Serializer {
     const bodyIndent = lead.includes('\n') ? lead.slice(lead.lastIndexOf('\n') + 1) : indent;
     const body = this.blocks(b.content ?? [], bodyIndent);
     return `#${a.callee}${(a.args as string | null) ?? ''}[${lead}${body}${trail}]`;
+  }
+
+  /**
+   * Eigene Funktion mit Feldern: der Original-Aufruf ist die Vorlage, nur die Feld-Stellen
+   * werden neu geschrieben. Alles dazwischen (Name, Kommas, Einrückung, Code-Argumente) bleibt.
+   */
+  private callFields(b: J, indent: string): string {
+    const a = b.attrs ?? {};
+    const tpl = String(a.src ?? '');
+    const spans = Array.isArray(a.spans) ? (a.spans as [number, number][]) : [];
+    const byIdx = new Map<number, J[]>();
+    for (const f of b.content ?? []) {
+      const i = Number(f.attrs?.idx);
+      byIdx.set(i, [...(byIdx.get(i) ?? []), f]);
+    }
+    const order = spans.map((span, idx) => ({ idx, start: span[0], end: span[1] })).sort((x, y) => y.start - x.start);
+    let out = tpl;
+    for (const { idx, start, end } of order) {
+      out = out.slice(0, start) + this.field(byIdx.get(idx) ?? [], tpl, start, end, indent) + out.slice(end);
+    }
+    const base = typeof a.baseIndent === 'string' ? a.baseIndent : '';
+    return reindent(out, base, indent);
+  }
+
+  private field(nodes: J[], tpl: string, start: number, end: number, indent: string): string {
+    const original = tpl.slice(start, end);
+    const isStr = original.startsWith('"');
+    if (!nodes.length) return isStr ? '""' : '[]';
+    // Einrückung der Zeile, in der das Feld steht (null: mitten in einer Zeile wie beim Parsen)
+    const lineStart = tpl.lastIndexOf('\n', start - 1) + 1;
+    const prefix = tpl.slice(lineStart, start);
+    const fieldIndent = lineStart > 0 && /^[ \t]*$/.test(prefix) ? prefix : null;
+    if (nodes.length === 1) {
+      const kept = this.preserved(nodes[0], fieldIndent ?? '');
+      if (kept !== null) return kept;
+    }
+    if (isStr) {
+      const text = nodes.map((n) => (n.content ?? []).map((c) => c.text ?? '').join('')).join(' ');
+      return stringLiteral(text);
+    }
+    const a = nodes[0].attrs ?? {};
+    const lead = typeof a.lead === 'string' ? a.lead : '';
+    const trail = typeof a.trail === 'string' ? a.trail : '';
+    const lineIndent = tpl.slice(lineStart).match(/^[ \t]*/)![0];
+    const bodyIndent = lead.includes('\n') ? lead.slice(lead.lastIndexOf('\n') + 1) : lineStart > 0 ? lineIndent : indent;
+    const body = this.blocks(
+      nodes.flatMap((n) => n.content ?? []),
+      bodyIndent,
+    );
+    return `[${lead}${body}${trail}]`;
   }
 
   private image(b: J, code: boolean): string {

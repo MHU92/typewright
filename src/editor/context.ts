@@ -1,5 +1,7 @@
 // Dokumentkontext für Node-Views (Pfad, Ordner), plus kleine UI-Brücke für Dialoge.
 
+import type { J } from '../typst/parse';
+
 type Listener = () => void;
 
 export interface DocContext {
@@ -66,4 +68,23 @@ export function registerCodeDialog(fn: (r: CodeEditRequest) => void) {
 
 export function editCode(r: CodeEditRequest) {
   openCodeDialog?.(r);
+}
+
+// ------------------------------------------------------------------ Typst-Brücke
+
+export interface TypstBridge {
+  /** Typst-Quelltext in Editor-Blöcke umwandeln (mit Erhalt des Original-Quelltexts). */
+  load: (code: string) => Promise<J[] | null>;
+  /** Block so schreiben, wie er beim Speichern im Dokument stünde. */
+  write: (block: J) => string;
+}
+
+let bridge: TypstBridge | null = null;
+
+export function registerTypstBridge(b: TypstBridge) {
+  bridge = b;
+}
+
+export function typstBridge(): TypstBridge | null {
+  return bridge;
 }

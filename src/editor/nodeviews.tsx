@@ -1,10 +1,13 @@
 // How the Typst-specific nodes look in the editor.
 
-import { useState, useSyncExternalStore, type CSSProperties, type MouseEvent } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent } from 'react';
 import { NodeViewContent, NodeViewWrapper, useEditorState, type ReactNodeViewProps } from '@tiptap/react';
-import { ChevronDown, ChevronRight, Code2, ExternalLink, FileText, MessageSquare, Pencil, Trash2 } from 'lucide-react';
-import { useGeometry, useRender } from '../render/snippets';
-import { assetUrl, editCode, getDocContext, subscribeDocContext } from './context';
+import { Check, ChevronDown, ChevronRight, Code2, ExternalLink, FileText, MessageSquare, Pencil, Trash2 } from 'lucide-react';
+import { TextSelection } from '@tiptap/pm/state';
+import { callFieldsSource, useGeometry, useRender, type SnippetRender } from '../render/snippets';
+import { assetUrl, editCode, getDocContext, subscribeDocContext, typstBridge } from './context';
+import { selectionOutside } from './schema';
+import type { J } from '../typst/parse';
 import { typstColorToCss } from '../typst/values';
 import { t } from '../i18n';
 import { useLang } from '../ui/useLang';
@@ -356,6 +359,125 @@ export function CallBlockView({ node, selected, updateAttributes }: ReactNodeVie
         {callee}
       </div>
       <NodeViewContent className="tw-call-content" />
+    </NodeViewWrapper>
+  );
+}
+
+// ------------------------------------------------------------------ Eigene Funktion mit Feldern
+
+/**
+ * `#entry("2024", "Titel", body: [...])`: zeigt den Aufruf so, wie Typst ihn setzt. Steht der
+ * Cursor darin (Klick, Pfeiltasten, Suchen), werden die Felder direkt in der Seite editierbar.
+ */
+export function CallFieldsView({ node, editor, getPos, deleteNode }: ReactNodeViewProps) {
+  useLang();
+  const ctx = useDocContext();
+  const geo = useGeometry();
+  const src = useMemo(() => callFieldsSource(node), [node]);
+  const r = useRender('block', src);
+  const callee = String(node.attrs.callee);
+  const inside = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => {
+      const pos = getPos();
+      if (typeof pos !== 'number' || !ed) return false;
+      const here = ed.state.doc.nodeAt(pos);
+      const { from, to } = ed.state.selection;
+      return !!here && from > pos && to < pos + here.nodeSize;
+    },
+  });
+  // Bis das neue Rendering da ist, das letzte zeigen: nach dem Bearbeiten klappt der Block sofort zurück
+  const last = useRef<SnippetRender | null>(null);
+  if (r?.status === 'ok' && r.url && !r.empty) last.current = r;
+  else if (r?.status === 'error') last.current = null;
+  const shown = last.current;
+  const rendered = !!shown;
+  const editing = inside || !rendered;
+
+  const enter = (e: MouseEvent) => {
+    stop(e);
+    const pos = getPos();
+    if (typeof pos !== 'number') return;
+    const { state, view } = editor;
+    view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(pos + 1), 1)).scrollIntoView());
+    view.focus();
+  };
+  const leave = (e: MouseEvent) => {
+    stop(e);
+    const pos = getPos();
+    if (typeof pos !== 'number') return;
+    const out = selectionOutside(editor.state, pos, pos + node.nodeSize);
+    if (out) editor.view.dispatch(editor.state.tr.setSelection(out));
+    else editor.view.dom.blur();
+  };
+  const editAsCode = (e: MouseEvent) => {
+    stop(e);
+    const bridge = typstBridge();
+    const json = node.toJSON() as J;
+    const code = bridge ? bridge.write({ ...json, attrs: { ...json.attrs, label: null, sep: null } }) : src;
+    editCode({
+      title: t('#{callee}(…) as Typst code', { callee }),
+      hint: t('The whole call. Its text can also be edited right in the page: click it.'),
+      code,
+      onSave: async (next) => {
+        if (next === code || !bridge) return;
+        const blocks = await bridge.load(next);
+        const pos = getPos();
+        if (!blocks || typeof pos !== 'number') return;
+        const cur = editor.state.doc.nodeAt(pos);
+        if (!cur || cur.type.name !== 'callFields') return;
+        // Abstand davor und Label bleiben am ersten neuen Block
+        const first = blocks[0];
+        if (first) {
+          const keepsLabel = !!editor.schema.nodes[first.type]?.spec.attrs?.label;
+          first.attrs = {
+            ...first.attrs,
+            sep: cur.attrs.sep,
+            ...(keepsLabel && cur.attrs.label ? { label: cur.attrs.label, labelSep: cur.attrs.labelSep } : {}),
+          };
+        }
+        const nodes = blocks.map((b) => editor.schema.nodeFromJSON(b));
+        editor.view.dispatch(editor.state.tr.replaceWith(pos, pos + cur.nodeSize, nodes));
+      },
+      onDelete: deleteNode,
+    });
+  };
+
+  const others = (node.attrs.others as string[] | null) ?? [];
+  let img = null;
+  if (shown) {
+    const style: CSSProperties = geo
+      ? { width: `${shown.width}pt`, marginLeft: `${-geo.marginLeft}pt`, maxWidth: 'none' }
+      : { width: '100%' };
+    img = <img className="tw-snippet-img" src={shown.url} style={style} draggable={false} alt="" />;
+  }
+  return (
+    <NodeViewWrapper className={`tw-fields ${editing ? 'is-editing' : 'is-rendered'} ${ctx.showMarks ? 'show-marks' : ''}`}>
+      {!editing && (
+        <div className="tw-fields-render" contentEditable={false} onMouseDown={enter} title={t('Click to edit the text')}>
+          {img}
+        </div>
+      )}
+      <div className="tw-fields-tag" contentEditable={false}>
+        {callee}
+      </div>
+      <div className="tw-block-tools" contentEditable={false}>
+        {editing ? (
+          rendered && (
+            <button onMouseDown={leave} title={t('Show as typeset (Esc)')}>
+              <Check size={13} /> {t('Done')}
+            </button>
+          )
+        ) : (
+          <button onMouseDown={enter} title={t('Edit the text of this element')}>
+            <Pencil size={13} /> {t('Edit text')}
+          </button>
+        )}
+        <button onMouseDown={stop} onClick={editAsCode} title={others.length ? `${t('Edit code')}: ${others.join(', ')}` : t('Edit code')}>
+          <Code2 size={13} /> {t('Code')}
+        </button>
+      </div>
+      <NodeViewContent className="tw-fields-content" />
     </NodeViewWrapper>
   );
 }

@@ -4,7 +4,7 @@ import { EditorState, TextSelection } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import type { AnyExtension } from '@tiptap/core';
 import { editorExtensions } from './editor/schema';
-import { CallBlockView, ImageView, MathBlockView, MathInlineView, PageBreakView, TocView, TypstBlockView, TypstInlineView } from './editor/nodeviews';
+import { CallBlockView, CallFieldsView, ImageView, MathBlockView, MathInlineView, PageBreakView, TocView, TypstBlockView, TypstInlineView } from './editor/nodeviews';
 import { FindExtension } from './editor/find';
 import {
   applyFormatPainter,
@@ -17,9 +17,9 @@ import {
   shortcutsExtension,
   ui,
 } from './editor/commands';
-import { registerCodeDialog, setDocContext, type CodeEditRequest } from './editor/context';
+import { registerCodeDialog, registerTypstBridge, setDocContext, type CodeEditRequest } from './editor/context';
 import { loadDocument, saveDocument } from './typst/document';
-import type { PreserveMap } from './typst/serialize';
+import { serializeBlock, type PreserveMap } from './typst/serialize';
 import { planSnippets, renderSnippets, renders, rewritePaths, useGeometry } from './render/snippets';
 import type { InitInfo, MenuCommand, PreviewResult, ProjectInfo, Settings } from './shared/api';
 import { Ribbon } from './ui/Ribbon';
@@ -47,6 +47,7 @@ const NODE_VIEWS: Record<string, React.ComponentType<any>> = {
   mathBlock: MathBlockView,
   mathInline: MathInlineView,
   callBlock: CallBlockView,
+  callFields: CallFieldsView,
   image: ImageView,
   toc: TocView,
   pageBreak: PageBreakView,
@@ -679,6 +680,17 @@ export default function App() {
     ui.openLink = () => setLinkOpen(true);
     ui.openFind = (replace) => setFind(replace ? 'replace' : 'find');
     registerCodeDialog((r) => setCodeDialog(r));
+    registerTypstBridge({
+      load: async (code) => {
+        const ed = editorRef.current;
+        if (!ed) return null;
+        const part = loadDocument(ed.schema, code, await window.tw.parse(code));
+        // Den eingegebenen Wortlaut merken, damit er beim Speichern genau so zurückkommt
+        for (const [k, v] of part.preserve) if (!docRef.current.preserve.has(k)) docRef.current.preserve.set(k, v);
+        return part.doc.content ?? [];
+      },
+      write: (block) => serializeBlock(block, { preserve: docRef.current.preserve, justifyDefault: !!geometryRef.current?.justify }),
+    });
   }, []);
 
   useEffect(() => {

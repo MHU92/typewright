@@ -22,6 +22,8 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import { BulletList, OrderedList, ListItem, ListKeymap } from '@tiptap/extension-list';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { Dropcursor, Gapcursor, UndoRedo, TrailingNode } from '@tiptap/extensions';
+import { Selection, TextSelection, type EditorState } from '@tiptap/pm/state';
+import { GapCursor } from '@tiptap/pm/gapcursor';
 import { typstColorToCss } from '../typst/values';
 
 /** Block-Knoten, die einen `sep`-Wert (Leerraum davor im Quelltext) tragen. */
@@ -40,6 +42,7 @@ export const BLOCK_TYPES = [
   'mathBlock',
   'typstBlock',
   'callBlock',
+  'callFields',
   'pageBreak',
   'toc',
 ];
@@ -65,7 +68,7 @@ const SepAttribute = Extension.create({
         },
       },
       {
-        types: ['heading', 'figure', 'table', 'image', 'callBlock', 'mathBlock', 'typstBlock'],
+        types: ['heading', 'figure', 'table', 'image', 'callBlock', 'callFields', 'mathBlock', 'typstBlock'],
         attributes: {
           label: { default: null, rendered: false },
           labelSep: { default: null, rendered: false },
@@ -330,6 +333,179 @@ export const CallBlockNode = Node.create({
   },
 });
 
+const jsonAttr = (name: string) => ({
+  default: null,
+  parseHTML: (el: HTMLElement) => {
+    try {
+      return JSON.parse(el.getAttribute(name) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  renderHTML: () => ({}),
+});
+const dataAttr = (name: string, fallback: unknown = null) => ({
+  default: fallback,
+  parseHTML: (el: HTMLElement) => el.getAttribute(name) ?? fallback,
+  renderHTML: () => ({}),
+});
+
+function insideFields(sel: Selection): boolean {
+  const $f = sel.$from;
+  for (let d = $f.depth; d > 0; d--) if ($f.node(d).type.name === 'callFields') return true;
+  return false;
+}
+
+/**
+ * Eine Auswahl knapp außerhalb des Bereichs `start`–`end` (ein Aufruf mit Feldern), die nicht
+ * gleich im nächsten Aufruf landet: dahinter, sonst davor, sonst als Lücken-Cursor.
+ */
+export function selectionOutside(state: EditorState, start: number, end: number): Selection | null {
+  const after = TextSelection.near(state.doc.resolve(end), 1);
+  if (after.from >= end && !insideFields(after)) return after;
+  const before = TextSelection.near(state.doc.resolve(start), -1);
+  if (before.to <= start && !insideFields(before)) return before;
+  const $end = state.doc.resolve(end);
+  // `valid` gibt es zur Laufzeit, die Typen von prosemirror-gapcursor kennen es nur nicht
+  const gapOk = (GapCursor as unknown as { valid: (p: typeof $end) => boolean }).valid($end);
+  if (gapOk) return new GapCursor($end);
+  return null;
+}
+
+/**
+ * Aufruf einer eigenen Funktion mit Feldern, z. B. `#entry("2024", "Titel", body: [...])`.
+ * `src` ist der Original-Aufruf, `spans` die Stellen der Felder darin (Index = `idx` der Felder).
+ */
+export const CallFieldsNode = Node.create({
+  name: 'callFields',
+  group: 'block',
+  content: 'callField+',
+  isolating: true,
+  defining: true,
+  // Ein Klick auf das Rendering setzt den Cursor ins erste Feld (die Node-View übernimmt das)
+  selectable: false,
+  addKeyboardShortcuts() {
+    return {
+      // Felder verlassen: der Aufruf wird wieder so gezeigt, wie Typst ihn setzt
+      Escape: () => {
+        const { state, view } = this.editor;
+        const { $from } = state.selection;
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name !== 'callFields') continue;
+          const out = selectionOutside(state, $from.before(d), $from.after(d));
+          if (out) view.dispatch(state.tr.setSelection(out).scrollIntoView());
+          else view.dom.blur();
+          return true;
+        }
+        return false;
+      },
+    };
+  },
+  addAttributes() {
+    return {
+      callee: dataAttr('data-callee', 'f'),
+      src: dataAttr('data-src', ''),
+      spans: jsonAttr('data-spans'),
+      /** Argumente ohne Text (Zahlen, Farben, Code): nur zur Anzeige. */
+      others: jsonAttr('data-others'),
+      baseIndent: dataAttr('data-indent', ''),
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-call-fields]' }];
+  },
+  renderHTML({ node }) {
+    // Alle Attribute ins HTML, damit Kopieren und Einfügen den Aufruf vollständig mitnimmt
+    return [
+      'div',
+      {
+        'data-call-fields': '',
+        'data-callee': node.attrs.callee,
+        'data-src': node.attrs.src,
+        'data-spans': JSON.stringify(node.attrs.spans),
+        'data-others': JSON.stringify(node.attrs.others),
+        'data-indent': node.attrs.baseIndent,
+        class: 'tw-fields',
+      },
+      0,
+    ];
+  },
+});
+
+const fieldAttrs = () => ({
+  idx: { default: 0, parseHTML: (el: HTMLElement) => Number(el.getAttribute('data-idx') ?? 0), renderHTML: () => ({}) },
+  label: dataAttr('data-label'),
+});
+
+/** Feld aus einem String-Argument: eine Zeile reiner Text. */
+export const CallFieldStrNode = Node.create({
+  name: 'callFieldStr',
+  group: 'callField',
+  content: 'text*',
+  marks: '',
+  isolating: true,
+  addAttributes() {
+    return fieldAttrs();
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-field-str]' }];
+  },
+  renderHTML({ node }) {
+    return [
+      'div',
+      { 'data-field-str': '', 'data-idx': node.attrs.idx, 'data-label': node.attrs.label ?? '', class: 'tw-arg tw-arg-str' },
+      0,
+    ];
+  },
+  addKeyboardShortcuts() {
+    // Ein String hat keine Absätze: Enter springt wie in einem Formular ins nächste Feld
+    const next = () => {
+      const { state, view } = this.editor;
+      const { $from } = state.selection;
+      if ($from.parent.type.name !== 'callFieldStr') return false;
+      const after = $from.after();
+      const $after = state.doc.resolve(after);
+      const target = $after.nodeAfter ? after + 1 : $from.after($from.depth - 1);
+      view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(Math.min(target, state.doc.content.size)), 1)).scrollIntoView());
+      return true;
+    };
+    return { Enter: next, 'Shift-Enter': next };
+  },
+});
+
+/** Feld aus einem Inhaltsblock `[...]`: beliebiger Text mit Absätzen, Listen, Auszeichnung. */
+export const CallFieldContentNode = Node.create({
+  name: 'callFieldContent',
+  group: 'callField',
+  content: 'block+',
+  isolating: true,
+  defining: true,
+  addAttributes() {
+    return {
+      ...fieldAttrs(),
+      lead: dataAttr('data-lead', ''),
+      trail: dataAttr('data-trail', ''),
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-field-content]' }];
+  },
+  renderHTML({ node }) {
+    return [
+      'div',
+      {
+        'data-field-content': '',
+        'data-idx': node.attrs.idx,
+        'data-label': node.attrs.label ?? '',
+        'data-lead': node.attrs.lead,
+        'data-trail': node.attrs.trail,
+        class: 'tw-arg tw-arg-content',
+      },
+      0,
+    ];
+  },
+});
+
 export const PageBreakNode = Node.create({
   name: 'pageBreak',
   group: 'block',
@@ -526,6 +702,9 @@ export function schemaExtensions(): AnyExtension[] {
     TypstBlockNode,
     TypstInlineNode,
     CallBlockNode,
+    CallFieldsNode,
+    CallFieldStrNode,
+    CallFieldContentNode,
     PageBreakNode,
     TocNode,
     LinkMark,

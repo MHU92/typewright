@@ -451,4 +451,13 @@ export const DE: Record<string, string> = {
   'These standards cannot be combined. Choose PDF/A-2 or PDF/A-3 together with PDF/UA.':
     'Diese Standards lassen sich nicht kombinieren. Zusammen mit PDF/UA PDF/A-2 oder PDF/A-3 wählen.',
   'Set the document language: #set text(lang: "de").': 'Die Dokumentsprache setzen: #set text(lang: "de").',
+  // Eigene Funktionen mit Feldern
+  'Click to edit the text': 'Klicken, um den Text zu bearbeiten',
+  'Show as typeset (Esc)': 'Wieder gesetzt anzeigen (Esc)',
+  Done: 'Fertig',
+  'Edit the text of this element': 'Den Text dieses Elements bearbeiten',
+  'Edit text': 'Text bearbeiten',
+  '#{callee}(…) as Typst code': '#{callee}(…) als Typst-Code',
+  'The whole call. Its text can also be edited right in the page: click it.':
+    'Der ganze Aufruf. Seinen Text kannst du auch direkt in der Seite bearbeiten: einfach hineinklicken.',
 };

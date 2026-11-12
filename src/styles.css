@@ -1256,6 +1256,90 @@ button {
   border-left: 2pt solid #ccc;
 }
 
+/* Eigene Funktionen mit Feldern (#entry("…", body: […]) usw.) */
+.tw-fields {
+  position: relative;
+  margin: 0;
+  border-radius: 3px;
+}
+.tw-fields.is-rendered .tw-fields-content {
+  display: none;
+}
+.tw-fields-render {
+  cursor: text;
+}
+.tw-fields.is-rendered:hover {
+  box-shadow: 0 0 0 1px rgba(43, 87, 154, 0.25);
+}
+.tw-fields.is-editing {
+  box-shadow: 0 0 0 1px rgba(43, 87, 154, 0.35);
+  background: rgba(43, 87, 154, 0.025);
+}
+.tw-fields:hover > .tw-block-tools,
+.tw-fields.is-editing > .tw-block-tools {
+  display: flex;
+}
+.tw-fields-tag {
+  position: absolute;
+  left: -8px;
+  top: 2px;
+  transform: translateX(-100%);
+  font-family: var(--ui);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 3px;
+  background: #eef1f5;
+  color: #5d6b82;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.tw-fields.is-rendered:hover > .tw-fields-tag,
+.tw-fields.is-rendered.show-marks > .tw-fields-tag {
+  opacity: 1;
+}
+.tw-fields-content {
+  padding: 3px 0;
+}
+.tw-arg {
+  position: relative;
+  min-height: 1.3em;
+  border-radius: 2px;
+}
+.tw-arg + .tw-arg {
+  margin-top: 3px;
+}
+.tw-arg:hover {
+  background: rgba(43, 87, 154, 0.05);
+}
+/* Feldname aus der Funktionsdefinition, im linken Rand wie die Formatvorlagen-Spalte in Word */
+.tw-arg::before {
+  content: attr(data-label);
+  position: absolute;
+  left: -10px;
+  top: 0.2em;
+  transform: translateX(-100%);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ui);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #8a96a8;
+  pointer-events: none;
+  user-select: none;
+}
+.tw-arg-content > :first-child {
+  margin-top: 0;
+}
+.tw-arg-content > :last-child {
+  margin-bottom: 0;
+}
+
 /* Inline */
 .tw-call-mark {
   border-bottom: 1px dotted rgba(43, 87, 154, 0.55);

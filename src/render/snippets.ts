@@ -6,6 +6,8 @@
 import { useSyncExternalStore } from 'react';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import type { Diagnostic, SnippetResult } from '../shared/api';
+import type { J } from '../typst/parse';
+import { serializeBlock } from '../typst/serialize';
 
 export type SnippetKind = 'block' | 'math' | 'math-inline' | 'inline';
 
@@ -44,6 +46,12 @@ export interface Geometry {
 }
 
 export const key = (kind: SnippetKind, src: string) => `${kind}\u0000${src}`;
+
+/** Typst-Quelltext eines Aufrufs mit Feldern (ohne Label), so wie er gerendert wird. */
+export function callFieldsSource(node: PMNode): string {
+  const json = node.toJSON() as J;
+  return serializeBlock({ ...json, attrs: { ...json.attrs, label: null, sep: null } });
+}
 
 type Listener = () => void;
 
@@ -186,6 +194,12 @@ export function planSnippets(
           add(code);
           sig.push('C', code);
         } else if (kind === 'expr') snippet('block', child.attrs.src);
+        return;
+      }
+      if (t === 'callFields') {
+        // Gerendert wie ein Code-Block; die Felder können selbst Schnipsel enthalten
+        snippet('block', callFieldsSource(child));
+        walk(child, false);
         return;
       }
       if (t === 'mathBlock') return snippet('math', child.attrs.src);
