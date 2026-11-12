@@ -935,7 +935,7 @@ function ViewTab({ settings, onSettings, onCommand }: RibbonProps) {
       </Group>
       <Group label="Typst">
         <Btn large icon={<Variable size={22} />} label={t('Inputs')} title={t('sys.inputs for preview and export')} onClick={() => onCommand('inputs')} />
-        <Btn large icon={<FileDown size={22} />} label="PDF" title={t('Export as PDF (⌘E)')} onClick={() => onCommand('export-pdf')} />
+        <Btn large icon={<FileDown size={22} />} label={t('Export')} title={t('PDF, PDF/A, accessible PDF, HTML, PNG or SVG (⌘E)')} onClick={() => onCommand('export')} />
         <Btn large icon={<Printer size={22} />} label={t('Print')} onClick={() => onCommand('print')} />
       </Group>
     </>

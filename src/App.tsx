@@ -24,7 +24,7 @@ import { planSnippets, renderSnippets, renders, rewritePaths, useGeometry } from
 import type { InitInfo, MenuCommand, PreviewResult, ProjectInfo, Settings } from './shared/api';
 import { Ribbon } from './ui/Ribbon';
 import { FindBar, NavPane, PreviewPane, Problems, SourcePane, StatusBar, TitleBar, type ScrollAnchor } from './ui/Panes';
-import { Backstage, CodeDialog, InputsDialog, LinkDialog, TableDialog } from './ui/Dialogs';
+import { Backstage, CodeDialog, ExportDialog, InputsDialog, LinkDialog, TableDialog } from './ui/Dialogs';
 import { getTemplates } from './ui/templates';
 import { setLang, t } from './i18n';
 import { useLang } from './ui/useLang';
@@ -106,6 +106,7 @@ export default function App() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [backstage, setBackstage] = useState(false);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [stats, setStats] = useState({ words: 0, chars: 0 });
@@ -479,11 +480,8 @@ export default function App() {
         case 'save-and-close':
           if (await save(false)) window.tw.closeNow();
           return;
-        case 'export-pdf': {
-          const out = await window.tw.exportPdf(serialize());
-          if (out) setToast(t('PDF saved: {file}', { file: out.split('/').pop() ?? '' }));
-          return;
-        }
+        case 'export':
+          return setExportOpen(true);
         case 'print':
           return window.tw.print(serialize());
         case 'undo':
@@ -898,6 +896,27 @@ export default function App() {
       {codeDialog && <CodeDialog request={codeDialog} onClose={() => setCodeDialog(null)} />}
       {linkOpen && <LinkDialog editor={editor} onClose={() => setLinkOpen(false)} />}
       {tableOpen && <TableDialog editor={editor} onClose={() => setTableOpen(false)} />}
+      {exportOpen && (
+        <ExportDialog
+          initial={settings.exportOptions}
+          pages={pageCount}
+          onExport={async (o) => {
+            const res = await window.tw.exportDoc(serialize(), o);
+            if (res.status === 'saved') {
+              setSettings((s) => (s ? { ...s, exportOptions: o } : s));
+              const first = res.files[0];
+              const name = first.split('/').pop() ?? '';
+              const text =
+                res.files.length > 1
+                  ? t('{n} files saved: {file} …', { n: res.files.length, file: name })
+                  : t('Exported: {file}', { file: name });
+              setToast(text, { label: t('Show in Finder'), run: () => window.tw.showExported(first, 'reveal') });
+            }
+            return res;
+          }}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
       {inputsOpen && (
         <InputsDialog
           inputs={(path && settings.inputsByFile[path]) || {}}

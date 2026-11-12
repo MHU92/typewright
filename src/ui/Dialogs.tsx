@@ -2,10 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
-import { FilePlus2, FolderOpen, FileDown, Printer, Info, X, FileText, Save, FolderSearch, Settings as SettingsIcon, Heart } from 'lucide-react';
+import { FilePlus2, FolderOpen, FileDown, Printer, Info, X, FileText, Save, FolderSearch, Settings as SettingsIcon, Heart, Globe, Image as ImageIcon, Shapes, AlertCircle } from 'lucide-react';
 import type { CodeEditRequest } from '../editor/context';
 import { CodeEditor } from './CodeEditor';
-import { AGENT_NAMES, type AgentKind, type MenuCommand, type ProjectInfo, type Settings } from '../shared/api';
+import {
+  AGENT_NAMES,
+  type AgentKind,
+  type Diagnostic,
+  type ExportFormat,
+  type ExportOptions,
+  type ExportResult,
+  type MenuCommand,
+  type PdfaLevel,
+  type ProjectInfo,
+  type Settings,
+} from '../shared/api';
 import { getTemplates } from './templates';
 import { getLang, t } from '../i18n';
 
@@ -225,6 +236,218 @@ export function InputsDialog({ inputs, source, onSave, onClose }: { inputs: Reco
   );
 }
 
+// ------------------------------------------------------------------ Export
+
+const PDFA_LEVELS: { value: Exclude<PdfaLevel, ''>; label: string }[] = [
+  { value: 'a-2b', label: 'PDF/A-2b' },
+  { value: 'a-2u', label: 'PDF/A-2u' },
+  { value: 'a-2a', label: 'PDF/A-2a' },
+  { value: 'a-3b', label: 'PDF/A-3b' },
+  { value: 'a-3u', label: 'PDF/A-3u' },
+  { value: 'a-3a', label: 'PDF/A-3a' },
+  { value: 'a-4', label: 'PDF/A-4' },
+];
+
+/** `1-3, 5, 8-` → `1-3,5,8-`; null if it isn't a valid page selection. */
+export function normalizePages(input: string): string | null {
+  const s = input.replace(/\s+/g, '');
+  if (!s) return '';
+  return /^\d+(-\d*)?(,\d+(-\d*)?)*$/.test(s) ? s : null;
+}
+
+/** A plain-language explanation for errors that are typical when exporting. */
+function explainExportError(message: string): string | null {
+  if (/missing alt text/i.test(message))
+    return t('Pictures and equations need a text alternative, e.g. #image("photo.jpg", alt: "…") or #math.equation(alt: "…", …).');
+  if (/missing document title/i.test(message)) return t('Set a document title in the template: #set document(title: [Your title]).');
+  if (/mutually incompatible/i.test(message)) return t('These standards cannot be combined. Choose PDF/A-2 or PDF/A-3 together with PDF/UA.');
+  if (/language/i.test(message) && /PDF\/(UA|A)/.test(message)) return t('Set the document language: #set text(lang: "de").');
+  return null;
+}
+
+export function ExportDialog({
+  initial,
+  pages,
+  onExport,
+  onClose,
+}: {
+  initial: ExportOptions;
+  /** Page count of the current preview (0 if unknown). */
+  pages: number;
+  onExport: (o: ExportOptions) => Promise<ExportResult>;
+  onClose: () => void;
+}) {
+  const [o, setO] = useState<ExportOptions>(initial);
+  const [pdfaOn, setPdfaOn] = useState(!!initial.pdfa);
+  const [pdfaLevel, setPdfaLevel] = useState<Exclude<PdfaLevel, ''>>(initial.pdfa || 'a-2b');
+  const [range, setRange] = useState(!!initial.pages);
+  const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState<Diagnostic[]>([]);
+  const set = (patch: Partial<ExportOptions>) => {
+    setO((prev) => ({ ...prev, ...patch }));
+    setProblems([]);
+  };
+  const isPdf = o.format === 'pdf';
+  const paged = o.format !== 'html';
+  // PDF/A-4 needs PDF 2.0, PDF/UA-1 needs PDF 1.7 or lower
+  const level = o.pdfua && pdfaLevel === 'a-4' ? 'a-2a' : pdfaLevel;
+  // Typst never tags a page selection, so an accessible PDF always has all pages
+  const rangeAllowed = paged && !(isPdf && o.pdfua);
+  const pageSel = range && rangeAllowed ? normalizePages(o.pages) : '';
+
+  const run = async () => {
+    if (busy || pageSel === null) return;
+    const sent: ExportOptions = { ...o, pdfa: pdfaOn ? level : '', pages: pageSel ?? '' };
+    setBusy(true);
+    setProblems([]);
+    try {
+      const res = await onExport(sent);
+      if (res.status === 'failed') {
+        setProblems(res.diagnostics.filter((d) => d.severity === 'error'));
+      } else if (res.status === 'saved') onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const formats: { id: ExportFormat; icon: React.ReactNode; label: string; sub: string }[] = [
+    { id: 'pdf', icon: <FileText size={20} />, label: 'PDF', sub: t('Document') },
+    { id: 'html', icon: <Globe size={20} />, label: 'HTML', sub: t('Web page') },
+    { id: 'png', icon: <ImageIcon size={20} />, label: 'PNG', sub: t('Image per page') },
+    { id: 'svg', icon: <Shapes size={20} />, label: 'SVG', sub: t('Vector per page') },
+  ];
+
+  return (
+    <Modal title={t('Export')} onClose={onClose}>
+      <div className="tw-export">
+        <div className="tw-export-formats" role="radiogroup">
+          {formats.map((f) => (
+            <button key={f.id} role="radio" aria-checked={o.format === f.id} className={o.format === f.id ? 'on' : ''} onClick={() => set({ format: f.id })}>
+              {f.icon}
+              <b>{f.label}</b>
+              <span>{f.sub}</span>
+            </button>
+          ))}
+        </div>
+
+        {isPdf && (
+          <div className="tw-export-section">
+            <div className="tw-export-label">{t('Standards')}</div>
+            <label className="tw-export-check">
+              <input type="checkbox" checked={pdfaOn} onChange={(e) => (setPdfaOn(e.target.checked), setProblems([]))} />
+              <div>
+                <b>{t('PDF/A for long-term archiving')}</b>
+                <span>{t('Embeds all fonts and colours so the file looks the same in decades. Often required for submissions and records.')}</span>
+              </div>
+              <select
+                className="tw-select"
+                value={level}
+                disabled={!pdfaOn}
+                onChange={(e) => (setPdfaLevel(e.target.value as Exclude<PdfaLevel, ''>), setProblems([]))}
+              >
+                {PDFA_LEVELS.map((l) => (
+                  <option key={l.value} value={l.value} disabled={o.pdfua && l.value === 'a-4'}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="tw-export-check">
+              <input type="checkbox" checked={o.pdfua} onChange={(e) => set({ pdfua: e.target.checked })} />
+              <div>
+                <b>{t('PDF/UA-1, accessible')}</b>
+                <span>{t('Readable with screen readers, as public authorities expect. Pictures and equations need alternative text, the document a title.')}</span>
+              </div>
+            </label>
+          </div>
+        )}
+
+        {paged && (
+          <div className="tw-export-section">
+            <div className="tw-export-label">{t('Pages')}</div>
+            <div className="tw-export-pages">
+              <label>
+                <input type="radio" checked={!range || !rangeAllowed} onChange={() => setRange(false)} />
+                {pages === 1 ? t('All (1 page)') : pages ? t('All ({n} pages)', { n: pages }) : t('All')}
+              </label>
+              <label>
+                <input type="radio" checked={range && rangeAllowed} disabled={!rangeAllowed} onChange={() => setRange(true)} />
+                {t('Pages')}
+              </label>
+              <input
+                className={`tw-input ${range && rangeAllowed && pageSel === null ? 'invalid' : ''}`}
+                value={o.pages}
+                disabled={!rangeAllowed}
+                placeholder={t('e.g. 1-3, 5')}
+                onFocus={() => setRange(true)}
+                onChange={(e) => set({ pages: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && void run()}
+              />
+            </div>
+            {!rangeAllowed && <div className="tw-export-note">{t('An accessible PDF always contains all pages.')}</div>}
+            {range && rangeAllowed && pageSel === null && <div className="tw-export-note error">{t('Use page numbers and ranges, e.g. 1-3, 5 or 8-.')}</div>}
+          </div>
+        )}
+
+        {o.format === 'png' && (
+          <div className="tw-export-section">
+            <div className="tw-export-label">{t('Resolution')}</div>
+            <select className="tw-select" value={o.ppi} onChange={(e) => set({ ppi: Number(e.target.value) })}>
+              <option value={72}>72 ppi · {t('screen')}</option>
+              <option value={144}>144 ppi · {t('Retina')}</option>
+              <option value={300}>300 ppi · {t('print')}</option>
+              <option value={600}>600 ppi</option>
+            </select>
+          </div>
+        )}
+
+        {o.format === 'html' && (
+          <div className="tw-export-note">
+            {t('Experimental in Typst: the page layout (margins, headers, columns) is dropped, equations become MathML. Good for publishing text on the web.')}
+          </div>
+        )}
+        {(o.format === 'png' || o.format === 'svg') && pages > 1 && !(range && pageSel) && (
+          <div className="tw-export-note">{t('One file per page, numbered: name-01.{ext}, name-02.{ext} …', { ext: o.format })}</div>
+        )}
+
+        {problems.length > 0 && (
+          <div className="tw-export-problems">
+            {problems.slice(0, 6).map((d, i) => {
+              const why = explainExportError(d.message);
+              return (
+                <div key={i} className="tw-export-problem">
+                  <AlertCircle size={13} />
+                  <div>
+                    <div>
+                      {d.line ? <b>{t('Line {n}', { n: d.line })}: </b> : null}
+                      {d.message}
+                    </div>
+                    {why && <div className="tw-export-why">{why}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="tw-export-open">
+          <input type="checkbox" checked={o.open} onChange={(e) => set({ open: e.target.checked })} />
+          {t('Open after export')}
+        </label>
+      </div>
+      <div className="tw-modal-foot">
+        <div className="tw-pane-spacer" />
+        <button className="tw-button" onClick={onClose}>
+          {t('Cancel')}
+        </button>
+        <button className="tw-button primary" disabled={busy || pageSel === null} onClick={() => void run()}>
+          {busy ? t('Exporting …') : t('Export …')}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 // ------------------------------------------------------------------ File view ("backstage")
 
 type BackstageView = 'info' | 'new' | 'open' | 'options' | 'about';
@@ -285,8 +508,8 @@ export function Backstage(p: {
         <button onClick={() => p.onCommand('save-as')}>
           <Save size={16} /> {t('Save As')}
         </button>
-        <button onClick={() => p.onCommand('export-pdf')}>
-          <FileDown size={16} /> {t('Export as PDF')}
+        <button onClick={() => p.onCommand('export')}>
+          <FileDown size={16} /> {t('Export')}
         </button>
         <button onClick={() => p.onCommand('print')}>
           <Printer size={16} /> {t('Print')}

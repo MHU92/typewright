@@ -28,6 +28,7 @@ Huge thanks to Laurenz Mädje, Martin Haug and everyone who builds Typst. If you
 - **Document layout** (Layout tab): paper size, orientation, margins, columns, header and footer, page numbers, default font and size, language, justification, line and paragraph spacing, heading numbering. These are written as `#set` rules in your document's template.
 - **Your own functions stay yours:** text inside `#callout[…]`, `#txt[…]` and the like stays editable; code-only calls such as charts are rendered by Typst right in the page.
 - **Live print preview** that follows your scroll position, plus page count, word count and compile errors.
+- **Export** (⌘E): PDF, PDF/A (2b to 4) for archiving, accessible PDF/UA-1 (also combined with PDF/A-2 or A-3), HTML with MathML equations (experimental in Typst), PNG or SVG per page, and page ranges. Typst's conformance errors, such as missing alt text, are explained in plain words.
 - **Multi-file projects:** a chapter included via `#include` is previewed through its main file, with the main file's template.
 - **Typst source view** side by side; edits there apply immediately.
 - **AutoSave**, conflict protection and live reload when the file changes on disk.

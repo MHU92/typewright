@@ -65,9 +65,39 @@ export interface Settings {
   /** Befehl bei `agent: 'custom'`. */
   customCommand: string;
   autoSave: boolean;
+  /** Zuletzt gewählte Export-Einstellungen. */
+  exportOptions: ExportOptions;
   inputsByFile: Record<string, Record<string, string>>;
   mainByFile: Record<string, string>;
   recent: string[];
+}
+
+export type ExportFormat = 'pdf' | 'html' | 'png' | 'svg';
+
+/** PDF/A-Teile, die Typst schreiben kann (Auswahl). */
+export type PdfaLevel = '' | 'a-2b' | 'a-2u' | 'a-2a' | 'a-3b' | 'a-3u' | 'a-3a' | 'a-4';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  /** PDF/A für die Langzeitarchivierung ('' = keins). */
+  pdfa: PdfaLevel;
+  /** PDF/UA-1: barrierefreies PDF. */
+  pdfua: boolean;
+  /** Seitenauswahl wie bei `--pages`, z. B. `1-3,5`; leer = alle. */
+  pages: string;
+  /** Auflösung für PNG. */
+  ppi: number;
+  /** Nach dem Export mit dem Standardprogramm öffnen. */
+  open: boolean;
+}
+
+export const DEFAULT_EXPORT: ExportOptions = { format: 'pdf', pdfa: '', pdfua: false, pages: '', ppi: 144, open: false };
+
+export interface ExportResult {
+  status: 'saved' | 'cancelled' | 'failed';
+  /** Geschriebene Dateien (bei PNG/SVG eine je Seite). */
+  files: string[];
+  diagnostics: Diagnostic[];
 }
 
 export type AgentKind = 'claude' | 'codex' | 'custom';
@@ -99,7 +129,7 @@ export type MenuCommand =
   | 'save'
   | 'save-as'
   | 'save-and-close'
-  | 'export-pdf'
+  | 'export'
   | 'print'
   | 'undo'
   | 'redo'
@@ -158,7 +188,9 @@ export interface TwApi {
   project(text: string): Promise<ProjectInfo>;
   preview(text: string): Promise<PreviewResult>;
   snippets(text: string, doc: string, evalExpr: string | null): Promise<SnippetResult>;
-  exportPdf(text: string): Promise<string | null>;
+  exportDoc(text: string, opts: ExportOptions): Promise<ExportResult>;
+  /** Exportierte Datei öffnen oder im Finder zeigen. */
+  showExported(file: string, how: 'open' | 'reveal'): void;
   print(text: string): Promise<void>;
   fonts(): Promise<string[]>;
   pickImage(): Promise<string | null>;

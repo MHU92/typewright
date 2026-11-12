@@ -8,12 +8,12 @@ import { pathToFileURL } from 'node:url';
 import { TypstParser } from './parser';
 import { prepareOverlay } from './overlay';
 import { projectInfo } from './project';
-import { compileSvgPages, evalInDocument, findTypst, gcPages, inputArgs, listFonts, runTypst, typstVersion, type Diagnostic } from './typst';
+import { compileSvgPages, evalInDocument, findTypst, gcPages, inputArgs, listFonts, runTypst, typstVersion, type Diagnostic, type RunResult } from './typst';
 import { killAll, killTerminal, resizeTerminal, startTerminal, writeTerminal } from './terminal';
 import { prepareClaude, prepareCodex, writeContext } from './claude';
 // Some handlers have a local `t` (compile target); they use the alias `tr` for translations
 import { setLang, t, t as tr } from '../src/i18n';
-import type { AgentKind, MenuCommand, PreviewResult, SaveResult, Settings, SnippetResult } from '../src/shared/api';
+import { DEFAULT_EXPORT, type AgentKind, type ExportOptions, type ExportResult, type MenuCommand, type PreviewResult, type SaveResult, type Settings, type SnippetResult } from '../src/shared/api';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 const appRoot = path.join(__dirname, '..');
@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: Settings = {
   agent: 'claude',
   customCommand: '',
   autoSave: false,
+  exportOptions: DEFAULT_EXPORT,
   inputsByFile: {},
   mainByFile: {},
   recent: [],
@@ -57,6 +58,7 @@ let settings: Settings = { ...DEFAULT_SETTINGS };
 function loadSettings() {
   try {
     settings = { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) };
+    settings.exportOptions = { ...DEFAULT_EXPORT, ...settings.exportOptions };
   } catch {
     settings = { ...DEFAULT_SETTINGS };
   }
@@ -384,7 +386,7 @@ function buildMenu() {
         { label: t('Save'), accelerator: 'Cmd+S', click: () => send('save') },
         { label: t('Save As …'), accelerator: 'Shift+Cmd+S', click: () => send('save-as') },
         { type: 'separator' },
-        { label: t('Export as PDF …'), accelerator: 'Cmd+E', click: () => send('export-pdf') },
+        { label: t('Export …'), accelerator: 'Cmd+E', click: () => send('export') },
         { label: t('Print …'), accelerator: 'Cmd+P', click: () => send('print') },
         { type: 'separator' },
         { label: t('Show in Finder'), click: () => send('reveal') },
@@ -527,6 +529,19 @@ function mapDiagnostics(diags: Diagnostic[], t: Target, d: DocWindow, snippetFil
     return { ...g, file };
   });
 }
+
+/** Verschieben, auch über Laufwerksgrenzen (der Temp-Ordner liegt evtl. woanders). */
+function moveFile(from: string, to: string) {
+  try {
+    fs.renameSync(from, to);
+  } catch {
+    fs.copyFileSync(from, to);
+    fs.rmSync(from, { force: true });
+  }
+}
+
+/** Dateien, die in dieser Sitzung exportiert wurden (dürfen geöffnet/gezeigt werden). */
+const exported = new Set<string>();
 
 function keepRecent(list: string[][], names: string[], max = 3) {
   list.push(names);
@@ -686,22 +701,69 @@ function registerIpc() {
     };
   });
 
-  ipcMain.handle('export-pdf', async (e, text: string) => {
+  ipcMain.handle('export', async (e, text: string, opts: ExportOptions): Promise<ExportResult> => {
     const d = docFor(e.sender);
+    const o: ExportOptions = { ...DEFAULT_EXPORT, ...opts };
+    settings.exportOptions = o;
+    saveSettings();
+    const ext = o.format;
+    const label = ext.toUpperCase();
     const base = d.path ? path.basename(d.path, '.typ') : tr('Untitled');
-    const res = await dialog.showSaveDialog(d.win, {
-      title: tr('Export as PDF'),
-      defaultPath: path.join(d.path ? path.dirname(d.path) : app.getPath('documents'), `${base}.pdf`),
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    });
-    if (res.canceled || !res.filePath) return null;
+    // Selbsttests exportieren ohne Speichern-Dialog in einen festen Ordner
+    const testDir = process.env.TW_AUTOTEST && process.env.TW_EXPORT_DIR;
+    const res = testDir
+      ? { canceled: false, filePath: path.join(testDir, `${base}.${ext}`) }
+      : await dialog.showSaveDialog(d.win, {
+          title: tr('Export as {format}', { format: label }),
+          defaultPath: path.join(d.path ? path.dirname(d.path) : app.getPath('documents'), `${base}.${ext}`),
+          filters: [{ name: label, extensions: [ext] }],
+        });
+    if (res.canceled || !res.filePath) return { status: 'cancelled', files: [], diagnostics: [] };
+    const out = res.filePath.toLowerCase().endsWith(`.${ext}`) ? res.filePath : `${res.filePath}.${ext}`;
     const t = prepareTarget(d, text);
-    const out = await runTypst(['compile', t.main, res.filePath, '--root', t.root, ...inputArgs(inputsFor(d))], path.dirname(t.main));
-    if (!out.ok) {
-      dialog.showErrorBox(tr('PDF export failed'), out.stderr.slice(0, 2000));
-      return null;
+    const common = ['--root', t.root, ...inputArgs(inputsFor(d))];
+    const pages = o.pages.trim();
+    let files: string[] = [];
+    let run: RunResult;
+    if (ext === 'pdf') {
+      const standards = [o.pdfa, o.pdfua ? 'ua-1' : ''].filter(Boolean);
+      const args = ['compile', t.main, out, '--format', 'pdf', ...common];
+      if (standards.length) args.push('--pdf-standard', standards.join(','));
+      // Ein Seitenauszug ist nie getaggt (Typst-Vorgabe); bei PDF/UA daher immer alle Seiten
+      if (pages && !o.pdfua) args.push('--pages', pages, '--no-pdf-tags');
+      run = await runTypst(args, path.dirname(t.main));
+      files = [out];
+    } else if (ext === 'html') {
+      run = await runTypst(['compile', t.main, out, '--features', 'html', '--format', 'html', ...common], path.dirname(t.main));
+      files = [out];
+    } else {
+      // Eine Datei je Seite: erst in einen leeren Ordner, dann mit Seitennummer neben das Ziel
+      const dir = path.join(d.tmp, `export-${Date.now()}`);
+      fs.mkdirSync(dir, { recursive: true });
+      const args = ['compile', t.main, path.join(dir, `{0p}.${ext}`), '--format', ext, ...common];
+      if (pages) args.push('--pages', pages);
+      if (ext === 'png') args.push('--ppi', String(o.ppi));
+      run = await runTypst(args, path.dirname(t.main));
+      if (run.ok) {
+        const made = fs.readdirSync(dir).filter((n) => n.endsWith(`.${ext}`)).sort();
+        const stem = out.slice(0, -(ext.length + 1));
+        files = made.map((n) => (made.length === 1 ? out : `${stem}-${n}`));
+        made.forEach((n, i) => moveFile(path.join(dir, n), files[i]));
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
     }
-    return res.filePath;
+    const diagnostics = mapDiagnostics(run.diagnostics, t, d);
+    if (!run.ok) return { status: 'failed', files: [], diagnostics };
+    for (const f of files) exported.add(f);
+    if (o.open && files[0]) void shell.openPath(files[0]);
+    return { status: 'saved', files, diagnostics };
+  });
+
+  ipcMain.on('show-exported', (_e, file: string, how: 'open' | 'reveal') => {
+    // Nur Dateien, die Typewright selbst exportiert hat
+    if (!exported.has(file)) return;
+    if (how === 'open') void shell.openPath(file);
+    else shell.showItemInFolder(file);
   });
 
   ipcMain.handle('print', async (e, text: string) => {
