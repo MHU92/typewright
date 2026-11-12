@@ -87,7 +87,13 @@ export function readStringLiteral(expr: string): string | null {
 }
 
 export function stringLiteral(value: string): string {
-  return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    // Unsichtbare Zeichen (geschütztes Leerzeichen, weiches Trennzeichen, Nullbreite) sichtbar halten
+    .replace(/[\u00a0\u00ad\u200b-\u200d\u2060\u202f]/g, (c) => `\\u{${c.codePointAt(0)!.toString(16)}}`);
+  return '"' + escaped + '"';
 }
 
 export const PAPER_SIZES: Record<string, [number, number]> = {

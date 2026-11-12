@@ -389,26 +389,30 @@ class InlineWriter {
   }
 
   syncMarks(marks: JMark[], nodes: J[], i: number) {
+    // Offene Markierungen bleiben offen, solange sie weiterlaufen, auch wenn ProseMirror sie
+    // anders sortiert: aus `#box[a #link(…)[b] c]` würden sonst drei Boxen (anderer Umbruch)
     let k = 0;
-    while (k < this.stack.length && k < marks.length && sameMark(this.stack[k].mark, marks[k])) k++;
+    while (k < this.stack.length && marks.some((m) => sameMark(m, this.stack[k].mark))) k++;
     while (this.stack.length > k) {
       const top = this.stack.pop()!;
       this.emit(top.close);
       if (top.close === ']') this.codeTail = 'call';
     }
-    for (let m = k; m < marks.length; m++) {
+    for (const m of marks) {
+      if (this.stack.some((s) => sameMark(s.mark, m))) continue;
       if (this.skipUntil > i) return;
-      this.open(marks[m], m, nodes, i);
+      this.open(m, this.stack.length, nodes, i);
     }
   }
 
-  /** Index nach dem letzten Knoten, der dieselben Markierungen bis Stufe `depth` trägt. */
-  private spanEnd(nodes: J[], i: number, depth: number, mark: JMark): number {
-    const base = (nodes[i].marks ?? []).slice(0, depth);
+  /** Index nach dem letzten Knoten, der `mark` und alle schon offenen Markierungen trägt. */
+  private spanEnd(nodes: J[], i: number, mark: JMark): number {
+    const has = (ms: JMark[], m: JMark) => ms.some((x) => sameMark(x, m));
+    const open = this.stack.map((s) => s.mark);
     let j = i;
     while (j < nodes.length) {
       const ms = nodes[j].marks ?? [];
-      if (ms.length <= depth || !sameMark(ms[depth], mark) || !base.every((b, x) => sameMark(b, ms[x]))) break;
+      if (!has(ms, mark) || !open.every((o) => has(ms, o))) break;
       j++;
     }
     return j;
@@ -423,7 +427,7 @@ class InlineWriter {
 
   private open(mark: JMark, depth: number, nodes: J[], i: number) {
     const a = mark.attrs ?? {};
-    const end = this.spanEnd(nodes, i, depth, mark);
+    const end = this.spanEnd(nodes, i, mark);
     const text = this.spanText(nodes, i, end);
     const prevChar = this.out.slice(-1);
     const nextNode = nodes[end];
